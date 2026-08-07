@@ -18,16 +18,16 @@ from skimage.color import rgb2lab, lab2rgb
 # ============================================================
 
 ORIGINAL_PALETTE = [
-    "#4D0006",  # C10
-    "#75050E",  # C9
-    "#A10D19",  # C8
-    "#C91827",  # C7
-    "#F42738",  # C6
-    "#F54C5A",  # C5
-    "#F7727D",  # C4
-    "#FA98A1",  # C3
-    "#FCC0C5",  # C2
-    "#FFE8EA",  # C1
+    "#001a4d",  # C10
+    "#022975",  # C9
+    "#063aa1",  # C8
+    "#0c4bc9",  # C7
+    "#105cf4",  # C6
+    "#3b79f5",  # C5
+    "#6596f7",  # C4
+    "#91b4fa",  # C3
+    "#bdd2fc",  # C2
+    "#e8f0ff",  # C1
 ]
 
 
@@ -51,7 +51,7 @@ CORE_INDEX = 4
 # ============================================================
 # 2. Bézier 优化参数
 #
-# 这些值决定“线性 → 曲线”的程度
+# 这些值决定"线性 → 曲线"的程度
 #
 # x1/y1/x2/y2 类似 CSS cubic-bezier
 #
@@ -115,6 +115,9 @@ HUE_SMOOTHING_STRENGTH = 0.30
 
 # ============================================================
 # 3. 输出
+#
+# 每次运行结果按 001、002、003 … 递增保存
+# 图片存放在 images/<序号>/ 子文件夹中，与 CSV 区分
 # ============================================================
 
 OUTPUT_FOLDER = Path("final")
@@ -123,30 +126,92 @@ OUTPUT_FOLDER.mkdir(exist_ok=True)
 IMAGE_FOLDER = OUTPUT_FOLDER / "images"
 IMAGE_FOLDER.mkdir(exist_ok=True)
 
-CSV_PATH = (
-    OUTPUT_FOLDER
-    / "optimized_existing_palette.csv"
-)
 
-PALETTE_IMAGE_PATH = (
-    IMAGE_FOLDER
-    / "optimized_existing_palette.png"
-)
+def get_next_output_paths():
 
-LIGHTNESS_CURVE_PATH = (
-    IMAGE_FOLDER
-    / "lightness_comparison.png"
-)
+    existing = sorted(
+        OUTPUT_FOLDER.glob(
+            "optimized_existing_palette*.csv"
+        )
+    )
 
-CHROMA_CURVE_PATH = (
-    IMAGE_FOLDER
-    / "chroma_comparison.png"
-)
+    max_num = 0
 
-HUE_CURVE_PATH = (
-    IMAGE_FOLDER
-    / "hue_comparison.png"
-)
+    for f in existing:
+
+        stem = f.stem
+
+        try:
+
+            num = int(
+                stem.replace(
+                    "optimized_existing_palette",
+                    ""
+                ).lstrip("_")
+            )
+
+            max_num = max(
+                max_num,
+                num
+            )
+
+        except ValueError:
+            continue
+
+    next_num = (
+        max_num + 1
+    )
+
+    name = (
+        f"optimized_existing_palette"
+        f"_{next_num:03d}"
+    )
+
+    csv_path = (
+        OUTPUT_FOLDER
+        /
+        f"{name}.csv"
+    )
+
+    run_image_folder = (
+        IMAGE_FOLDER
+        /
+        f"{next_num:03d}"
+    )
+
+    run_image_folder.mkdir(exist_ok=True)
+
+    palette_image_path = (
+        run_image_folder
+        /
+        "optimized_existing_palette.png"
+    )
+
+    lightness_curve_path = (
+        run_image_folder
+        /
+        "lightness_comparison.png"
+    )
+
+    chroma_curve_path = (
+        run_image_folder
+        /
+        "chroma_comparison.png"
+    )
+
+    hue_curve_path = (
+        run_image_folder
+        /
+        "hue_comparison.png"
+    )
+
+    return (
+        csv_path,
+        palette_image_path,
+        lightness_curve_path,
+        chroma_curve_path,
+        hue_curve_path
+    )
 
 
 # ============================================================
@@ -861,7 +926,8 @@ def create_final_dataframe():
 # ============================================================
 
 def create_palette_image(
-    df
+    df,
+    image_path
 ):
 
     fig, ax = plt.subplots(
@@ -1000,7 +1066,7 @@ def create_palette_image(
     plt.tight_layout()
 
     plt.savefig(
-        PALETTE_IMAGE_PATH,
+        image_path,
         dpi=300,
         bbox_inches="tight"
     )
@@ -1110,18 +1176,29 @@ def main():
         ]
     )
 
+    (
+        csv_path,
+        palette_image_path,
+        lightness_curve_path,
+        chroma_curve_path,
+        hue_curve_path
+    ) = (
+        get_next_output_paths()
+    )
+
     df = (
         create_final_dataframe()
     )
 
     df.to_csv(
-        CSV_PATH,
+        csv_path,
         index=False,
         encoding="utf-8-sig"
     )
 
     create_palette_image(
-        df
+        df,
+        palette_image_path
     )
 
     create_curve_comparison(
@@ -1130,7 +1207,7 @@ def main():
         "Optimized_L",
         "Lightness Comparison",
         "L",
-        LIGHTNESS_CURVE_PATH
+        lightness_curve_path
     )
 
     create_curve_comparison(
@@ -1139,7 +1216,7 @@ def main():
         "Optimized_C",
         "Chroma Comparison",
         "C",
-        CHROMA_CURVE_PATH
+        chroma_curve_path
     )
 
     create_curve_comparison(
@@ -1148,7 +1225,7 @@ def main():
         "Optimized_H",
         "Hue Comparison",
         "Hue",
-        HUE_CURVE_PATH
+        hue_curve_path
     )
 
     print(
@@ -1178,23 +1255,23 @@ def main():
     )
 
     print(
-        CSV_PATH
+        csv_path
     )
 
     print(
-        PALETTE_IMAGE_PATH
+        palette_image_path
     )
 
     print(
-        LIGHTNESS_CURVE_PATH
+        lightness_curve_path
     )
 
     print(
-        CHROMA_CURVE_PATH
+        chroma_curve_path
     )
 
     print(
-        HUE_CURVE_PATH
+        hue_curve_path
     )
 
 
