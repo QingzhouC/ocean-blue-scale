@@ -1,5 +1,6 @@
 from pathlib import Path
 import math
+import sqlite3
 
 import numpy as np
 import pandas as pd
@@ -62,78 +63,59 @@ ANCHOR_HUE_TOLERANCE = 1.0
 
 
 # ============================================================
-# 3. 训练色卡
+# 3. 训练色卡（从数据库读取）
 #
 # 全部按照 C10 → C1
+#
+# 色卡数据存储在 palettes.db 中，
+# 运行 init_palette_db.py 初始化数据库。
 # ============================================================
 
-REFERENCE_PALETTES = {
+DB_PATH = Path(__file__).parent / "palettes.db"
 
-    "blue": [
-        "#001A4D",  # C10
-        "#062567",  # C9
-        "#0A399C",  # C8
-        "#064FD4",  # C7
-        "#105CF4",  # C6
-        "#1174FE",  # C5
-        "#6098FF",  # C4
-        "#9FC0FF",  # C3
-        "#D0E0FF",  # C2
-        "#E8F0FF",  # C1
-    ],
 
-    "red": [
-        "#4D0006",
-        "#66080E",
-        "#9B141D",
-        "#D3202D",
-        "#F42738",
-        "#FF4858",
-        "#FF7B84",
-        "#FFADB3",
-        "#FFD5D8",
-        "#FFE8EA",
-    ],
+def load_reference_palettes():
+    """从 palettes.db 读取所有参考色卡。
 
-    "pink": [
-        "#4D0040",
-        "#660255",
-        "#96057E",
-        "#C909A9",
-        "#E60FC2",
-        "#EB47CE",
-        "#F47DDD",
-        "#FBAEED",
-        "#FFD5F7",
-        "#FFE8FB",
-    ],
+    返回格式与原来的 REFERENCE_PALETTES 字典一致:
+        {
+            "blue": ["#001A4D", ...],
+            "red":  ["#4D0006", ...],
+            ...
+        }
+    """
 
-    "green": [
-        "#004D12",
-        "#035F17",
-        "#01801F",
-        "#00A426",
-        "#00B82B",
-        "#33C44D",
-        "#6DD67D",
-        "#A3EAB0",
-        "#D1F9D9",
-        "#E8FFED",
-    ],
+    if not DB_PATH.exists():
 
-    "yellow": [
-        "#4D4000",
-        "#685702",
-        "#9C8202",
-        "#D3B000",
-        "#F4CB00",
-        "#F4D339",
-        "#F8DF6F",
-        "#FCECA4",
-        "#FFF6D1",
-        "#FFFBE8",
-    ],
-}
+        raise FileNotFoundError(
+            "palettes.db 不存在，请先运行 init_palette_db.py"
+        )
+
+    conn = sqlite3.connect(DB_PATH)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT name, level, hex
+        FROM reference_palettes
+        ORDER BY name, position
+        """
+    )
+
+    palettes = {}
+
+    for name, level, hex_color in cursor.fetchall():
+
+        if name not in palettes:
+            palettes[name] = []
+
+        palettes[name].append(hex_color)
+
+    conn.close()
+
+    return palettes
+
 
 # ============================================================
 # 4. 输出
@@ -743,13 +725,15 @@ MODEL_KEYS = [
 
 def build_anchor_models():
 
+    reference_palettes = load_reference_palettes()
+
     models = {}
 
     for (
         name,
         colors
     ) in (
-        REFERENCE_PALETTES.items()
+        reference_palettes.items()
     ):
 
         models[name] = (
